@@ -83,12 +83,13 @@ h1, h2, h3 { color: white; }
 
 # ── SIDEBAR ──
 with st.sidebar:
-    st.markdown("""
+    st.markdown(f"""
     <div style="text-align:center; padding: 1rem 0 1.5rem;">
-        <div style="font-size:48px;">🚀</div>
-        <div style="font-family:Oxanium,sans-serif;font-size:18px;font-weight:700;margin-top:0.75rem;color:white;">DS Project 2</div>
-        <div style="font-size:12px;color:#93C5FD;font-family:monospace;">Food Delivery Time Prediction</div>
-        <div style="font-size:11px;color:#64748B;margin-top:4px;">ADJ Business Consulting</div>
+        <img src="data:image/jpeg;base64,{PHOTO_B64}"
+             style="width:110px;height:110px;border-radius:50%;object-fit:cover;object-position:top;border:3px solid #3B82F6;"/>
+        <div style="font-family:Oxanium,sans-serif;font-size:18px;font-weight:700;margin-top:0.75rem;color:white;">Anthony Djiady Djie</div>
+        <div style="font-size:12px;color:#93C5FD;font-family:monospace;">Data Analyst & Tax Practitioner</div>
+        <div style="font-size:11px;color:#64748B;margin-top:4px;">Palu, Indonesia</div>
     </div>
     """, unsafe_allow_html=True)
 
