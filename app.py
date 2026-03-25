@@ -10,6 +10,20 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import os
+import base64
+
+def _load_photo():
+    try:
+        img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo.jpg")
+        if os.path.exists(img_path):
+            with open(img_path, "rb") as f:
+                return base64.b64encode(f.read()).decode()
+    except Exception:
+        pass
+    return ""
+
+PHOTO_B64 = _load_photo()
 
 st.set_page_config(
     page_title="DS Project 2 — Food Delivery Time | ADJ Business Consulting",
@@ -91,6 +105,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("<div style='color:#93C5FD;font-size:11px;font-family:monospace;margin-bottom:8px;'>// navigate_to</div>", unsafe_allow_html=True)
     section = st.radio("", [
+        "👤 About Me",
         "📦 1. Project Overview",
         "🔍 2. Data Understanding",
         "📊 3. EDA",
@@ -180,9 +195,112 @@ def dark_fig(fig):
 
 
 # ════════════════════════════════════════════════
+# SECTION: ABOUT ME
+# ════════════════════════════════════════════════
+if section == "👤 About Me":
+    col_img, col_bio = st.columns([1, 2.5])
+    with col_img:
+        st.markdown(f"""
+        <div style="text-align:center;padding-top:1rem;">
+            <img src="data:image/jpeg;base64,{PHOTO_B64}"
+                 style="width:220px;height:220px;border-radius:12px;object-fit:cover;object-position:top;border:3px solid #3B82F6;box-shadow:0 8px 32px rgba(59,130,246,0.2);"/>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_bio:
+        st.markdown("# Anthony Djiady Djie")
+        st.markdown('<div style="color:#93C5FD;font-family:monospace;font-size:13px;margin-bottom:1rem;">Data Analyst · Tax Practitioner · Data Scientist (in training) · Palu, Indonesia</div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="info-card">
+        Data Analyst and Tax Practitioner with <strong style="color:white;">6+ years of experience</strong> supporting data analysis,
+        financial reporting, payroll, and tax compliance across multiple businesses.
+        Skilled in transforming financial and operational data into actionable insights through dashboards,
+        cash flow analysis, sales performance analysis, and payroll tax calculations including PPh 21.<br><br>
+        Currently enhancing analytical expertise through a <strong style="color:white;">Data Scientist bootcamp at Dibimbing.id (DS39+)</strong>,
+        with a career focus on analytics-driven finance, taxation, and business intelligence roles.
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("""
+            <div class="info-card">
+                <div style="color:#93C5FD;font-family:monospace;font-size:11px;margin-bottom:0.5rem;">// tools & skills</div>
+                <span class="tag">Python</span><span class="tag">SQL</span><span class="tag">Tableau</span>
+                <span class="tag">Power BI</span><span class="tag">Excel</span><span class="tag">Xero</span>
+                <span class="tag">Scikit-Learn</span><span class="tag">Pandas</span>
+            </div>
+            """, unsafe_allow_html=True)
+        with col_b:
+            st.markdown("""
+            <div class="info-card">
+                <div style="color:#93C5FD;font-family:monospace;font-size:11px;margin-bottom:0.5rem;">// certifications</div>
+                <span class="tag">Google Data Analytics</span><span class="tag">Tableau BI Analyst</span>
+                <span class="tag">Microsoft SQL</span><span class="tag">Microsoft Excel</span>
+                <span class="tag">IBM Python</span><span class="tag">Xero Advisor</span>
+                <span class="tag">Brevet Pajak A&B</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown('<div class="section-box">💼 Work Experience</div>', unsafe_allow_html=True)
+
+    experiences = [
+        ("Data Analyst", "PT Agri Mentari Trust", "Jan 2025 – Aug 2025",
+         "Developed financial dashboards and monthly performance reports. Analyzed sales performance and customer demand trends to support pricing strategy. Automated expense tracking using Excel."),
+        ("Data Analyst / Branch Manager / Tax Practitioner", "Share Tea, Palu Branch", "Jan 2019 – Oct 2024",
+         "Produced monthly cash flow and financial performance reports for a multi-million IDR monthly turnover branch. Analyzed 50+ SKUs, reducing stock discrepancies by 20–30%. Managed PPh 21 calculations and tax compliance."),
+        ("Data Analyst / Store Manager / Tax Practitioner", "Selebes Selular Palu", "Jan 2019 – Nov 2022",
+         "Generated weekly and monthly financial reports. Analyzed sales trends and inventory for high-value products, reducing overstock risk by 15–25%. Handled bookkeeping and bank reconciliation."),
+        ("Data Analyst / Branch Manager / Tax Practitioner", "Ayam Penyet Ria Palu", "Jan 2019 – Nov 2023",
+         "Prepared monthly financial and operational reports. Analyzed sales margins and labor costs to improve cost efficiency. Reduced inventory losses by 20%+."),
+    ]
+
+    for title, company, period, desc in experiences:
+        st.markdown(f"""
+        <div class="info-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.4rem;">
+                <div>
+                    <div style="color:white;font-weight:700;font-size:15px;">{title}</div>
+                    <div style="color:#93C5FD;font-size:13px;font-family:monospace;">{company}</div>
+                </div>
+                <div style="color:#64748B;font-size:12px;font-family:monospace;text-align:right;">{period}</div>
+            </div>
+            <div style="color:#94A3B8;font-size:13px;line-height:1.7;">{desc}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    col_l, col_r = st.columns(2)
+    with col_l:
+        st.markdown("""
+        <div class="info-card">
+            <div style="color:#93C5FD;font-family:monospace;font-size:11px;margin-bottom:0.5rem;">// education</div>
+            <div style="color:white;font-weight:700;">Data Analyst / Data Scientist — Dibimbing.id</div>
+            <div style="color:#64748B;font-size:12px;">Sep 2025 – Present · DS39+</div>
+            <br>
+            <div style="color:white;font-weight:700;">B.S in Business Management — Biola University</div>
+            <div style="color:#64748B;font-size:12px;">2013 – 2016 · GPA 3.00/4.00</div>
+            <br>
+            <div style="color:white;font-weight:700;">High School Diploma — Greendale Secondary School Singapore</div>
+            <div style="color:#64748B;font-size:12px;">2008 – 2011</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_r:
+        st.markdown("""
+        <div class="info-card">
+            <div style="color:#93C5FD;font-family:monospace;font-size:11px;margin-bottom:0.5rem;">// languages</div>
+            <div style="margin-bottom:8px;"><span style="color:white;font-weight:600;">Indonesian</span> <span style="color:#64748B;">· Native</span></div>
+            <div style="margin-bottom:8px;"><span style="color:white;font-weight:600;">English</span> <span style="color:#64748B;">· C1 Advanced</span></div>
+            <div style="margin-bottom:8px;"><span style="color:white;font-weight:600;">Mandarin</span> <span style="color:#64748B;">· Conversational</span></div>
+            <div><span style="color:white;font-weight:600;">Malay</span> <span style="color:#64748B;">· Beginner</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════
 # SECTION 1: PROJECT OVERVIEW
 # ════════════════════════════════════════════════
-if section == "📦 1. Project Overview":
+elif section == "📦 1. Project Overview":
     st.markdown("# 🚀 Predicting Food Delivery Time with ML")
     st.markdown('<div style="color:#93C5FD;font-family:monospace;font-size:13px;margin-bottom:1.5rem;">DS Project 2 — ADJ Business Consulting · Food Delivery Times Dataset · 1,000 orders</div>', unsafe_allow_html=True)
 
