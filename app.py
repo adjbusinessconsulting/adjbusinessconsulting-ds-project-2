@@ -193,7 +193,10 @@ if section == "👤 About Me":
         st.markdown(f"""
         <div style="text-align:center;padding-top:1rem;">
             <img src="data:image/jpeg;base64,{PHOTO_B64}"
-                 style="width:220px;height:220px;border-radius:12px;object-fit:cover;object-position:top;border:3px solid #3B82F6;box-shadow:0 8px 32px rgba(59,130,246,0.2);"/>
+                 style="width:220px;height:220px;border-radius:50%;object-fit:cover;object-position:top;border:4px solid #3B82F6;box-shadow:0 8px 32px rgba(59,130,246,0.3);"/>
+            <div style="margin-top:1.1rem;color:white;font-family:Oxanium,sans-serif;font-size:20px;font-weight:800;">Anthony Djiady Djie</div>
+            <div style="color:#93C5FD;font-size:13px;font-weight:600;margin-top:0.3rem;">Data Analyst &amp; Tax Practitioner</div>
+            <div style="color:#64748B;font-size:12px;font-family:monospace;margin-top:0.3rem;">Palu, Indonesia</div>
         </div>
         """, unsafe_allow_html=True)
 
