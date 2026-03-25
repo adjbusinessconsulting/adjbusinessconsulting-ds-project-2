@@ -188,29 +188,16 @@ def dark_fig(fig):
 # SECTION: ABOUT ME
 # ════════════════════════════════════════════════
 if section == "👤 About Me":
-    # Row: [circle photo col] | [square photo col] | [bio text col]
-    col_img, col_sq, col_txt = st.columns([1, 1.2, 2.5])
-
+    col_img, col_bio = st.columns([1, 2.5])
     with col_img:
         st.markdown(f"""
         <div style="text-align:center;padding-top:1rem;">
             <img src="data:image/jpeg;base64,{PHOTO_B64}"
-                 style="width:180px;height:180px;border-radius:50%;object-fit:cover;object-position:top;border:4px solid #3B82F6;box-shadow:0 8px 32px rgba(59,130,246,0.3);"/>
-            <div style="margin-top:1rem;color:white;font-family:Oxanium,sans-serif;font-size:17px;font-weight:800;">Anthony Djiady Djie</div>
-            <div style="color:#93C5FD;font-size:12px;font-weight:600;margin-top:0.3rem;">Data Analyst &amp; Tax Practitioner</div>
-            <div style="color:#64748B;font-size:11px;font-family:monospace;margin-top:0.3rem;">Palu, Indonesia</div>
+                 style="width:220px;height:220px;border-radius:12px;object-fit:cover;object-position:top;border:3px solid #3B82F6;box-shadow:0 8px 32px rgba(59,130,246,0.2);"/>
         </div>
         """, unsafe_allow_html=True)
 
-    with col_sq:
-        st.markdown(f"""
-        <div style="padding-top:0.5rem;">
-            <img src="data:image/jpeg;base64,{PHOTO_B64}"
-                 style="width:100%;border-radius:12px;object-fit:cover;object-position:top;border:3px solid #3B82F6;box-shadow:0 8px 32px rgba(59,130,246,0.2);"/>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col_txt:
+    with col_bio:
         st.markdown("# Anthony Djiady Djie")
         st.markdown('<div style="color:#93C5FD;font-family:monospace;font-size:13px;margin-bottom:1rem;">Data Analyst · Tax Practitioner · Data Scientist (in training) · Palu, Indonesia</div>', unsafe_allow_html=True)
         st.markdown("""
