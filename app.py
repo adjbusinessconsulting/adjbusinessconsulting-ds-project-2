@@ -124,7 +124,7 @@ with st.sidebar:
 # ── LOAD & TRAIN ──
 @st.cache_data
 def load_and_train():
-    df = pd.read_parquet("food_delivery_times_dataset.parquet")
+    df = pd.read_parquet("food_delivery_time_dataset.parquet")
 
     target = 'Delivery_Time_min'
     df_model = df.drop(columns=['Order_ID']).copy()
@@ -409,7 +409,7 @@ elif section == "🔍 2. Data Understanding":
     col3.metric("Missing Values", f"{df.isnull().sum().sum()}")
 
     steps = [
-        ("Load Dataset", "1,000 rows × 9 columns loaded from Food_Delivery_Times_Dataset.csv"),
+        ("Load Dataset", "1,000 rows × 9 columns loaded from food_delivery_time_dataset.parquet"),
         ("Check Missing Values", "No missing values found — dataset is clean ✅"),
         ("Check Data Types", "Numeric columns confirmed · Categorical columns confirmed"),
         ("Drop Missing Rows", "dropna() applied on target column — no rows removed"),
@@ -719,15 +719,15 @@ elif section == "📈 6. Model Comparison":
             other_models[:2],
             other_colors
         ):
-        ya, yp = predictions[model_name]
-        fig_m = px.scatter(x=ya, y=yp, height=320, opacity=0.5,
-                            color_discrete_sequence=[color],
-                            labels={'x': 'Actual', 'y': 'Predicted'})
-        mn, mx = min(ya.min(), yp.min()), max(ya.max(), yp.max())
-        fig_m.add_trace(go.Scatter(x=[mn, mx], y=[mn, mx], mode='lines',
-                                    line=dict(color='white', dash='dash'), showlegend=False))
-        fig_m.update_layout(title=model_name, title_font_size=13)
-        col.plotly_chart(dark_fig(fig_m), use_container_width=True)
+            ya, yp = predictions[model_name]
+            fig_m = px.scatter(x=ya, y=yp, height=320, opacity=0.5,
+                                color_discrete_sequence=[color],
+                                labels={'x': 'Actual', 'y': 'Predicted'})
+            mn, mx = min(ya.min(), yp.min()), max(ya.max(), yp.max())
+            fig_m.add_trace(go.Scatter(x=[mn, mx], y=[mn, mx], mode='lines',
+                                        line=dict(color='white', dash='dash'), showlegend=False))
+            fig_m.update_layout(title=model_name, title_font_size=13)
+            col.plotly_chart(dark_fig(fig_m), use_container_width=True)
 
     st.markdown(f"""
     <div class="info-card">
