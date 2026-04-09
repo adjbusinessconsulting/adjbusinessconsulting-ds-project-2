@@ -124,7 +124,7 @@ with st.sidebar:
 # ── LOAD & TRAIN ──
 @st.cache_data
 def load_and_train():
-    df = pd.read_csv("Food_Delivery_Times_Dataset.csv")
+    df = pd.read_parquet("food_delivery_times_dataset.parquet")
 
     target = 'Delivery_Time_min'
     df_model = df.drop(columns=['Order_ID']).copy()
