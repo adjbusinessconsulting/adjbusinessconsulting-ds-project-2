@@ -4,12 +4,15 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from xgboost import XGBRegressor
+from copy import deepcopy
 import os
 import base64
 
@@ -121,60 +124,124 @@ with st.sidebar:
 # ── LOAD & TRAIN ──
 @st.cache_data
 def load_and_train():
-    df = pd.read_parquet("food_delivery_time_dataset.parquet")
-    df = df.dropna()
+    df = pd.read_csv("Food_Delivery_Times_Dataset.csv")
 
-    target = 'Delivery_Time_min' if 'Delivery_Time_min' in df.columns else df.columns[-1]
-    features = [c for c in df.columns if c != target and c != 'Order_ID']
-
-    cat_cols = df[features].select_dtypes(include='object').columns.tolist()
-    num_cols = df[features].select_dtypes(include='number').columns.tolist()
+    target = 'Delivery_Time_min'
+    df_model = df.drop(columns=['Order_ID']).copy()
 
     # Feature engineering
-    if 'Distance_km' in df.columns and 'Preparation_Time_min' in df.columns:
-        df['Distance_x_Prep'] = df['Distance_km'] * df['Preparation_Time_min']
-        num_cols.append('Distance_x_Prep')
-    if 'Time_of_Day' in df.columns:
-        df['Is_Rush_Hour'] = df['Time_of_Day'].isin(['Morning', 'Evening']).astype(int)
-        num_cols.append('Is_Rush_Hour')
+    df_model['Is_Rush_Hour'] = df_model['Time_of_Day'].apply(
+        lambda x: 1 if x in ['Morning', 'Evening'] else 0 if pd.notna(x) else np.nan
+    )
+    df_model['Distance_x_Prep_Time'] = df_model['Distance_km'] * df_model['Preparation_Time_min']
 
-    X = df[cat_cols + num_cols]
-    y = df[target]
+    # Drop rows where target is missing
+    df_model = df_model.dropna(subset=[target])
 
-    preprocessor = ColumnTransformer([
-        ('num', StandardScaler(), num_cols),
-        ('cat', OneHotEncoder(handle_unknown='ignore'), cat_cols)
+    X = df_model.drop(columns=[target])
+    y = df_model[target]
+
+    cat_cols = X.select_dtypes(include='object').columns.tolist()
+    num_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
+
+    # Preprocessing pipeline with imputers (matching notebook)
+    numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler())
+    ])
+    categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='most_frequent')),
+        ('onehot', OneHotEncoder(handle_unknown='ignore'))
+    ])
+    preprocessor = ColumnTransformer(transformers=[
+        ('num', numeric_transformer, num_cols),
+        ('cat', categorical_transformer, cat_cols)
     ])
 
     models = {
         'Linear Regression': LinearRegression(),
         'Random Forest': RandomForestRegressor(random_state=42),
-        'Gradient Boosting': GradientBoostingRegressor(random_state=42)
+        'XGBoost': XGBRegressor(random_state=42, verbosity=0)
+    }
+
+    param_distributions = {
+        'Linear Regression': {
+            'model__fit_intercept': [True, False]
+        },
+        'Random Forest': {
+            'model__n_estimators': [100, 200, 300],
+            'model__max_depth': [None, 5, 10, 20],
+            'model__min_samples_split': [2, 5, 10],
+            'model__min_samples_leaf': [1, 2, 4],
+            'model__max_features': ['sqrt', 'log2', None]
+        },
+        'XGBoost': {
+            'model__n_estimators': [100, 200, 300],
+            'model__max_depth': [3, 5, 7],
+            'model__learning_rate': [0.01, 0.05, 0.1, 0.2],
+            'model__subsample': [0.7, 0.8, 1.0],
+            'model__colsample_bytree': [0.7, 0.8, 1.0]
+        }
     }
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     results = {}
     predictions = {}
+    best_estimators = {}
+    tuning_results = []
+
     for name, model in models.items():
-        pipe = Pipeline([('prep', preprocessor), ('model', model)])
-        pipe.fit(X_train, y_train)
-        y_pred = pipe.predict(X_test)
+        pipeline = Pipeline(steps=[
+            ('preprocessor', preprocessor),
+            ('model', model)
+        ])
+        n_iter = 2 if name == 'Linear Regression' else 20
+        search = RandomizedSearchCV(
+            pipeline,
+            param_distributions=param_distributions[name],
+            n_iter=n_iter,
+            cv=5,
+            scoring='neg_root_mean_squared_error',
+            n_jobs=-1,
+            random_state=42,
+            verbose=0
+        )
+        search.fit(X_train, y_train)
+        best_cv_rmse = -search.best_score_
+        best_estimators[name] = search.best_estimator_
+        tuning_results.append({
+            'Model': name,
+            'Best CV RMSE': round(best_cv_rmse, 4),
+            'Best Params': search.best_params_
+        })
+
+        y_pred = search.best_estimator_.predict(X_test)
         results[name] = {
             'MAE': mean_absolute_error(y_test, y_pred),
             'RMSE': np.sqrt(mean_squared_error(y_test, y_pred)),
-            'R²': r2_score(y_test, y_pred)
+            'R²': r2_score(y_test, y_pred),
+            'CV RMSE': best_cv_rmse
         }
         predictions[name] = (y_test.values, y_pred)
 
-    best_pipe = Pipeline([('prep', preprocessor), ('model', LinearRegression())])
-    best_pipe.fit(X_train, y_train)
+    # Select best model by CV RMSE
+    tuning_df = pd.DataFrame(tuning_results).sort_values('Best CV RMSE')
+    best_model_name = tuning_df.iloc[0]['Model']
 
-    return df, results, predictions, best_pipe, X_test, y_test, cat_cols, num_cols, target
+    # Retrain best model on full dataset
+    best_pipe = deepcopy(best_estimators[best_model_name])
+    best_pipe.fit(X, y)
+
+    # Also keep the df with engineered features for display (add Order_ID back)
+    df['Is_Rush_Hour'] = df_model['Is_Rush_Hour'].values[:len(df)]
+    df['Distance_x_Prep_Time'] = df_model['Distance_x_Prep_Time'].values[:len(df)]
+
+    return df, results, predictions, best_pipe, X_test, y_test, cat_cols, num_cols, target, best_model_name, tuning_df
 
 
-with st.spinner("Training ML models..."):
-    df, results, predictions, best_pipe, X_test, y_test, cat_cols, num_cols, target = load_and_train()
+with st.spinner("Training ML models with RandomizedSearchCV..."):
+    df, results, predictions, best_pipe, X_test, y_test, cat_cols, num_cols, target, best_model_name, tuning_df = load_and_train()
 
 
 def dark_fig(fig):
@@ -302,7 +369,7 @@ elif section == "📦 1. Project Overview":
     for col, label, val in zip(
         [col1, col2, col3, col4],
         ["Total Orders", "Features Used", "Models Trained", "Best Model"],
-        ["1,000", "5+", "3", "Linear Regression"]
+        ["1,000", "5+", "3", best_model_name]
     ):
         col.metric(label, val)
 
@@ -342,13 +409,14 @@ elif section == "🔍 2. Data Understanding":
     col3.metric("Missing Values", f"{df.isnull().sum().sum()}")
 
     steps = [
-        ("Load Dataset", "1,000 rows × 9 columns loaded from food_delivery_time_dataset.parquet"),
+        ("Load Dataset", "1,000 rows × 9 columns loaded from Food_Delivery_Times_Dataset.csv"),
         ("Check Missing Values", "No missing values found — dataset is clean ✅"),
         ("Check Data Types", "Numeric columns confirmed · Categorical columns confirmed"),
-        ("Drop Missing Rows", "dropna() applied — no rows removed"),
-        ("Feature Engineering", "Distance_x_Prep interaction term created · Is_Rush_Hour binary flag added"),
+        ("Drop Missing Rows", "dropna() applied on target column — no rows removed"),
+        ("Feature Engineering", "Distance_x_Prep_Time interaction term created · Is_Rush_Hour binary flag added"),
         ("Train/Test Split", "80% training · 20% test · random_state=42"),
-        ("Preprocessing", "StandardScaler for numeric · OneHotEncoder for categorical"),
+        ("Preprocessing", "SimpleImputer + StandardScaler for numeric · SimpleImputer + OneHotEncoder for categorical"),
+        ("Hyperparameter Tuning", "RandomizedSearchCV with 5-fold CV · neg_root_mean_squared_error scoring"),
     ]
 
     for i, (step, result) in enumerate(steps):
@@ -446,7 +514,7 @@ elif section == "⚙️ 4. Feature Engineering":
     features_tbl = pd.DataFrame({
         "Feature": ["Distance_km", "Preparation_Time_min", "Courier_Experience_yrs",
                     "Weather", "Traffic_Level", "Time_of_Day", "Vehicle_Type",
-                    "Distance_x_Prep ✨", "Is_Rush_Hour ✨"],
+                    "Distance_x_Prep_Time ✨", "Is_Rush_Hour ✨"],
         "Type": ["Numeric", "Numeric", "Numeric", "Categorical", "Categorical",
                  "Categorical", "Categorical", "Engineered (Numeric)", "Engineered (Binary)"],
         "Purpose": [
@@ -464,15 +532,25 @@ elif section == "⚙️ 4. Feature Engineering":
     st.dataframe(features_tbl, use_container_width=True, hide_index=True)
 
     st.markdown("#### Preprocessing Pipeline")
-    st.code("""# ColumnTransformer Pipeline
-preprocessor = ColumnTransformer([
-    ('num', StandardScaler(), num_cols),
-    ('cat', OneHotEncoder(handle_unknown='ignore'), cat_cols)
+    st.code("""# ColumnTransformer Pipeline with Imputers
+numeric_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', StandardScaler())
+])
+categorical_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))
+])
+preprocessor = ColumnTransformer(transformers=[
+    ('num', numeric_transformer, numerical_features),
+    ('cat', categorical_transformer, categorical_features)
 ])
 
 # Engineered Features
-df['Distance_x_Prep'] = df['Distance_km'] * df['Preparation_Time_min']
-df['Is_Rush_Hour']    = df['Time_of_Day'].isin(['Morning', 'Evening']).astype(int)
+df_model['Distance_x_Prep_Time'] = df_model['Distance_km'] * df_model['Preparation_Time_min']
+df_model['Is_Rush_Hour'] = df_model['Time_of_Day'].apply(
+    lambda x: 1 if x in ['Morning', 'Evening'] else 0
+)
 
 # Train/Test Split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -501,13 +579,13 @@ elif section == "🤖 5. Model Training":
     models_info = [
         ("Linear Regression", "#3B82F6",
          "Assumes a linear relationship between features and delivery time. Fast, interpretable, and a strong baseline.",
-         ["No hyperparameters", "Highly interpretable", "Works well when relationships are linear"]),
+         ["Tuned via RandomizedSearchCV (2 iterations)", "Highly interpretable", "Works well when relationships are linear"]),
         ("Random Forest", "#34D399",
          "Ensemble of decision trees — captures non-linear interactions and feature importance automatically.",
-         ["n_estimators=100 (default)", "random_state=42", "Handles outliers well"]),
-        ("Gradient Boosting", "#FBBF24",
-         "Sequential boosting of weak learners — often the most accurate but slower to train.",
-         ["n_estimators=100 (default)", "random_state=42", "Best for complex patterns"]),
+         ["Tuned via RandomizedSearchCV (20 iterations)", "random_state=42", "Handles outliers well"]),
+        ("XGBoost", "#FBBF24",
+         "Extreme Gradient Boosting — sequential boosting of weak learners with regularization. Often the most accurate.",
+         ["Tuned via RandomizedSearchCV (20 iterations)", "random_state=42", "Best for complex patterns"]),
     ]
 
     for name, color, desc, params in models_info:
@@ -523,24 +601,36 @@ elif section == "🤖 5. Model Training":
 
     st.markdown("#### Training Code")
     st.code("""from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from xgboost import XGBRegressor
 
 models = {
     'Linear Regression': LinearRegression(),
     'Random Forest':     RandomForestRegressor(random_state=42),
-    'Gradient Boosting': GradientBoostingRegressor(random_state=42)
+    'XGBoost':           XGBRegressor(random_state=42, verbosity=0)
 }
 
 results = {}
 for name, model in models.items():
-    pipe = Pipeline([('prep', preprocessor), ('model', model)])
-    pipe.fit(X_train, y_train)
-    y_pred = pipe.predict(X_test)
+    pipeline = Pipeline([('preprocessor', preprocessor), ('model', model)])
+    search = RandomizedSearchCV(
+        pipeline,
+        param_distributions=param_distributions[name],
+        n_iter=20, cv=5,
+        scoring='neg_root_mean_squared_error',
+        n_jobs=-1, random_state=42
+    )
+    search.fit(X_train, y_train)
+    y_pred = search.best_estimator_.predict(X_test)
     results[name] = {
         'MAE':  mean_absolute_error(y_test, y_pred),
         'RMSE': np.sqrt(mean_squared_error(y_test, y_pred)),
         'R²':   r2_score(y_test, y_pred)
     }
+
+# Retrain best model on full dataset
+best_pipeline = deepcopy(best_estimators[best_model_name])
+best_pipeline.fit(X, y)
 """, language="python")
 
 
@@ -554,9 +644,9 @@ elif section == "📈 6. Model Comparison":
 
     # Metric cards
     col1, col2, col3 = st.columns(3)
-    model_colors = {"Linear Regression": "#3B82F6", "Random Forest": "#34D399", "Gradient Boosting": "#FBBF24"}
+    model_colors = {"Linear Regression": "#3B82F6", "Random Forest": "#34D399", "XGBoost": "#FBBF24"}
     for col, (name, row) in zip([col1, col2, col3], metrics_df.iterrows()):
-        is_best = name == 'Linear Regression'
+        is_best = name == best_model_name
         color = model_colors.get(name, "#93C5FD")
         col.markdown(f"""
         <div style="background:#162440;border-left:4px solid {color};border-radius:8px;
@@ -589,8 +679,8 @@ elif section == "📈 6. Model Comparison":
     st.plotly_chart(dark_fig(fig_r2), use_container_width=True)
 
     # Actual vs Predicted
-    st.markdown("#### Actual vs Predicted — Linear Regression")
-    y_actual, y_pred = predictions['Linear Regression']
+    st.markdown(f"#### Actual vs Predicted — {best_model_name}")
+    y_actual, y_pred = predictions[best_model_name]
     scatter_df = pd.DataFrame({'Actual': y_actual, 'Predicted': y_pred})
     scatter_df['Error'] = abs(scatter_df['Actual'] - scatter_df['Predicted'])
 
@@ -619,13 +709,16 @@ elif section == "📈 6. Model Comparison":
     st.plotly_chart(dark_fig(fig_res), use_container_width=True)
 
     # Other model charts
-    st.markdown("#### Actual vs Predicted — Random Forest & Gradient Boosting")
-    col_rf, col_gb = st.columns(2)
-    for col, model_name, color in zip(
-        [col_rf, col_gb],
-        ['Random Forest', 'Gradient Boosting'],
-        ['#34D399', '#FBBF24']
-    ):
+    other_models = [m for m in results.keys() if m != best_model_name]
+    if len(other_models) >= 2:
+        st.markdown(f"#### Actual vs Predicted — {other_models[0]} & {other_models[1]}")
+        col_rf, col_gb = st.columns(2)
+        other_colors = ['#34D399', '#FBBF24']
+        for col, model_name, color in zip(
+            [col_rf, col_gb],
+            other_models[:2],
+            other_colors
+        ):
         ya, yp = predictions[model_name]
         fig_m = px.scatter(x=ya, y=yp, height=320, opacity=0.5,
                             color_discrete_sequence=[color],
@@ -636,11 +729,11 @@ elif section == "📈 6. Model Comparison":
         fig_m.update_layout(title=model_name, title_font_size=13)
         col.plotly_chart(dark_fig(fig_m), use_container_width=True)
 
-    st.markdown("""
+    st.markdown(f"""
     <div class="info-card">
         <div style="color:#93C5FD;font-family:monospace;font-size:11px;margin-bottom:0.5rem;">// model_interpretation</div>
-        <strong style="color:white;">Linear Regression</strong> was chosen as the final model
-        due to its strong balance of performance and interpretability.
+        <strong style="color:white;">{best_model_name}</strong> was selected as the final model (lowest CV RMSE via RandomizedSearchCV)
+        and retrained on the full dataset.
         The R² score indicates the proportion of variance in delivery time explained by the features.
         Low MAE and RMSE confirm predictions are accurate within a few minutes on average.
     </div>
@@ -653,12 +746,12 @@ elif section == "📈 6. Model Comparison":
 elif section == "🎯 7. Live ETA Predictor":
     st.markdown('<div class="section-box">🎯 Section 7 — Live ETA Predictor</div>', unsafe_allow_html=True)
 
-    st.markdown("""
+    st.markdown(f"""
     <div class="info-card">
         <div style="color:#93C5FD;font-family:monospace;font-size:11px;margin-bottom:0.5rem;">// how_it_works</div>
         Enter delivery details below to get a <strong style="color:white;">real-time delivery time prediction</strong>
-        using the trained Linear Regression model. The model was trained on 800 orders
-        and is ready to predict on new inputs.
+        using the tuned <strong style="color:white;">{best_model_name}</strong> model, retrained on the full 1,000-order dataset
+        after hyperparameter tuning via RandomizedSearchCV.
     </div>
     """, unsafe_allow_html=True)
 
@@ -705,7 +798,7 @@ elif section == "🎯 7. Live ETA Predictor":
 
     # Engineered features
     if 'Distance_km' in inputs and 'Preparation_Time_min' in inputs:
-        inputs['Distance_x_Prep'] = inputs['Distance_km'] * inputs['Preparation_Time_min']
+        inputs['Distance_x_Prep_Time'] = inputs['Distance_km'] * inputs['Preparation_Time_min']
     if 'Time_of_Day' in inputs:
         inputs['Is_Rush_Hour'] = 1 if inputs['Time_of_Day'] in ['Morning', 'Evening'] else 0
 
@@ -721,13 +814,13 @@ elif section == "🎯 7. Live ETA Predictor":
                 {prediction:.1f} min
             </div>
             <div style="color:#94A3B8;font-size:14px;margin-top:0.5rem;">
-                Estimated Delivery Time · Linear Regression Model
+                Estimated Delivery Time · {best_model_name} (Tuned & Retrained on Full Data)
             </div>
         </div>
         """, unsafe_allow_html=True)
 
         st.markdown("#### Input Summary")
-        input_display = {k: v for k, v in inputs.items() if k not in ['Distance_x_Prep', 'Is_Rush_Hour']}
+        input_display = {k: v for k, v in inputs.items() if k not in ['Distance_x_Prep_Time', 'Is_Rush_Hour']}
         st.dataframe(pd.DataFrame([input_display]), use_container_width=True, hide_index=True)
 
     except Exception as e:
