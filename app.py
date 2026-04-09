@@ -11,7 +11,11 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from xgboost import XGBRegressor
+try:
+    from xgboost import XGBRegressor
+except ImportError:
+    st.error("⚠️ xgboost is not installed. Please add `xgboost` to your requirements.txt and redeploy.")
+    st.stop()
 from copy import deepcopy
 import os
 import base64
