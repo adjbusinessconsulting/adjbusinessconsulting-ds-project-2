@@ -498,6 +498,25 @@ elif section == "📊 3. EDA":
         fig_tod.update_layout(xaxis_title="Time of Day")
         st.plotly_chart(dark_fig(fig_tod), use_container_width=True)
 
+    st.markdown("#### 3.6 Distance vs Delivery Time")
+    if 'Distance_km' in df.columns:
+        fig_scatter = px.scatter(df, x='Distance_km', y=target, height=380,
+                                  color_discrete_sequence=["#F87171"],
+                                  trendline="ols",
+                                  trendline_color_override="#FBBF24",
+                                  labels={"Distance_km": "Distance (km)", target: "Delivery Time (min)"})
+        fig_scatter.update_traces(marker=dict(size=5, opacity=0.6))
+        fig_scatter.update_layout(showlegend=False)
+        st.plotly_chart(dark_fig(fig_scatter), use_container_width=True)
+
+    st.markdown("#### 3.7 Delivery Time by Vehicle Type")
+    if 'Vehicle_Type' in df.columns:
+        fig_veh = px.box(df, x='Vehicle_Type', y=target, height=360,
+                          color_discrete_sequence=["#A78BFA"],
+                          labels={"Vehicle_Type": "Vehicle Type", target: "Delivery Time (min)"})
+        fig_veh.update_layout(xaxis_title="Vehicle Type")
+        st.plotly_chart(dark_fig(fig_veh), use_container_width=True)
+
 
 # ════════════════════════════════════════════════
 # SECTION 4: FEATURE ENGINEERING
