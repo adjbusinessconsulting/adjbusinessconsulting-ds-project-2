@@ -470,35 +470,21 @@ elif section == "📊 3. EDA":
             fig_box_t.update_layout(xaxis_title="Traffic Level")
             st.plotly_chart(dark_fig(fig_box_t), use_container_width=True)
 
-    st.markdown("#### 3.3 Numerical Feature Distributions")
-    num_cols_plot = df.select_dtypes(include='number').columns.tolist()
-    if target in num_cols_plot:
-        num_cols_plot.remove(target)
-
-    cols = st.columns(3)
-    colors = ["#60A5FA", "#34D399", "#FBBF24", "#F87171", "#A78BFA"]
-    for i, feat in enumerate(num_cols_plot[:5]):
-        with cols[i % 3]:
-            fig = px.histogram(df, x=feat, nbins=30, height=250,
-                                color_discrete_sequence=[colors[i % len(colors)]])
-            fig.update_layout(showlegend=False, margin=dict(t=30, b=10))
-            st.plotly_chart(dark_fig(fig), use_container_width=True)
-
-    st.markdown("#### 3.4 Correlation Heatmap")
+    st.markdown("#### 3.3 Correlation Heatmap")
     corr_df = df.select_dtypes(include='number')
     if corr_df.shape[1] > 1:
         corr = corr_df.corr()
         fig_corr = px.imshow(corr, color_continuous_scale="Blues", text_auto=".2f", height=400)
         st.plotly_chart(dark_fig(fig_corr), use_container_width=True)
 
-    st.markdown("#### 3.5 Delivery Time by Time of Day")
+    st.markdown("#### 3.4 Delivery Time by Time of Day")
     if 'Time_of_Day' in df.columns:
         fig_tod = px.box(df, x='Time_of_Day', y=target, height=340,
                           color_discrete_sequence=["#34D399"])
         fig_tod.update_layout(xaxis_title="Time of Day")
         st.plotly_chart(dark_fig(fig_tod), use_container_width=True)
 
-    st.markdown("#### 3.6 Distance vs Delivery Time")
+    st.markdown("#### 3.5 Distance vs Delivery Time")
     if 'Distance_km' in df.columns:
         fig_scatter = px.scatter(df, x='Distance_km', y=target, height=380,
                                   color_discrete_sequence=["#F87171"],
@@ -509,7 +495,7 @@ elif section == "📊 3. EDA":
         fig_scatter.update_layout(showlegend=False)
         st.plotly_chart(dark_fig(fig_scatter), use_container_width=True)
 
-    st.markdown("#### 3.7 Delivery Time by Vehicle Type")
+    st.markdown("#### 3.6 Delivery Time by Vehicle Type")
     if 'Vehicle_Type' in df.columns:
         fig_veh = px.box(df, x='Vehicle_Type', y=target, height=360,
                           color_discrete_sequence=["#A78BFA"],
